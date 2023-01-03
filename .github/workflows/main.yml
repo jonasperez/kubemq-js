@@ -1,0 +1,53 @@
+name: Publish package to npm github registry
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: build package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        node-version: [16.x]
+    steps:
+      - name: Checkout Project
+        uses: actions/checkout@v3
+
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@jonasperez"
+
+      - name: Config .npmrc
+        run: echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > .npmrc
+
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+
+      - name: Yarn Cache
+        uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - name: Install Packages
+        run: yarn
+
+      - name: Build Lib
+        run: yarn build
+
+      - name: Publish Lib
+        run: npm publish --access=public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
